@@ -4,18 +4,6 @@
 #include <QSerial.h>
 Servo servo1Pan, servo2Tilt, servo3Grip;
 
-/*#define bumpL 2
-#define bumpR 3
-#define M2 4
-#define E2 5
-#define E1 6
-#define M1 7
-#define grip 9
-#define tilt 10
-#define pan 11
-#define LEL 12
-#define LER 13 */
-
 //Digital Pins
 #define bumpL    2
 #define bumpR    3
@@ -28,12 +16,12 @@ Servo servo1Pan, servo2Tilt, servo3Grip;
 #define encodeR  13
 
 //Analog Pins
-#define IR       A0
-#define grip     A1
-#define frontIR  A2
-#define leftIR   A3
+#define IRead A0
+#define grip A1
+#define frontIR A2
+#define leftIR A3
 #define centreIR A4
-#define rightIR  A5
+#define rightIR A5
 
 //ASCII Character Definitions
 #define L        76
@@ -44,9 +32,12 @@ Servo servo1Pan, servo2Tilt, servo3Grip;
 #define LTHRESH17 900
 #define CTHRESH17 900
 #define RTHRESH17 900
-byte  left_speed17  = 127;
-byte  right_speed17 = 127;
+byte  left_speed17  = 140;
+byte  right_speed17 = 140;
 bool speed_locked17;
+int centerSe = 0;
+int rightSe  = 0;
+int leftSe = 0;
 #define DELTA     5
 
 //Initial Variables
@@ -60,7 +51,7 @@ void backup() {
   analogWrite(speedR, 155);
   digitalWrite(motorL, LOW);
   analogWrite(speedL, 150);
-  if(leftIR == LTHRESH && centerIR == CTHRESH && rightIR == RTHRESH){
+  if(leftIR == LTHRESH17 && centreIR == CTHRESH17 && rightIR == RTHRESH17){
   analogWrite(speedL, 0);
   analogWrite(speedR, 0);
   }
@@ -68,46 +59,82 @@ void backup() {
 
 //Make robot go forwards
 void forward() {
+  int forward_state = 0;
+  centerSe = analogRead(centreIR);
+  rightSe = analogRead(rightIR);
+  leftSe = analogRead(leftIR);
   digitalWrite(motorR, HIGH);
-  analogWrite(speedR, left_speed);
+  analogWrite(speedR, 130);
   digitalWrite(motorL, HIGH);
-  analogWrite(speedL, right_speed);
-  if(leftIR == LTHRESH && centerIR == CTHRESH && rightIR == RTHRESH){
+  analogWrite(speedL, 250);
+ 
+  while(forward_state == 0){
+    centerSe = analogRead(centreIR);
+  rightSe = analogRead(rightIR);
+  leftSe = analogRead(leftIR);
+  if(leftSe > LTHRESH17 && centerSe > CTHRESH17 && rightSe > RTHRESH17){
   analogWrite(speedL, 0);
   analogWrite(speedR, 0);
+  forward_state = 1;
+  delay(1000);
+  }
+  
   }
 }
 
 //Make robot go left
 void left() {
+  int forward_state = 0;
+  centerSe = analogRead(centreIR);
+  rightSe = analogRead(rightIR);
+  leftSe = analogRead(leftIR);
   digitalWrite(motorR, HIGH);
-  analogWrite(speedR, left_speed);
-  digitalWrite(motorL, LOW);
+  analogWrite(speedR, 130);
+  digitalWrite(motorL, HIGH);
   analogWrite(speedL, 0);
-  if(leftIR == LTHRESH && centerIR == CTHRESH && rightIR == RTHRESH){
+  while(forward_state == 0){
+    centerSe = analogRead(centreIR);
+  rightSe = analogRead(rightIR);
+  leftSe = analogRead(leftIR);
+  if(centerSe > CTHRESH17){
   analogWrite(speedL, 0);
   analogWrite(speedR, 0);
+  forward_state = 1;
+  delay(1000);
+  }
+  
   }
 }
 
 //Make robot go right
 void right() {
-  digitalWrite(motorR, LOW);
+  int forward_state = 0;
+  centerSe = analogRead(centreIR);
+  rightSe = analogRead(rightIR);
+  leftSe = analogRead(leftIR);
+  digitalWrite(motorR, HIGH);
   analogWrite(speedR, 0);
   digitalWrite(motorL, HIGH);
-  analogWrite(speedL, right_speed);
-  if(leftIR == LTHRESH && centerIR == CTHRESH && rightIR == RTHRESH){
+  analogWrite(speedL, 170);
+  while(forward_state == 0){
+    centerSe = analogRead(centreIR);
+  rightSe = analogRead(rightIR);
+  leftSe = analogRead(leftIR);
+  if(centerSe > CTHRESH17){
   analogWrite(speedL, 0);
   analogWrite(speedR, 0);
+  forward_state = 1;
+  delay(1000);
+  }
+  
   }
 }
 
 //Make the robot take a 180 degree turn, needs to be completed
 void fullTurn(){
-  digitalWrite(motorR, LOW);
-  analogWrite(speedR, right_speed);
-  digitalWrite(motorL, HIGH);
-  analogWrite(speedL, left_speed);
+  right();
+  delay(500);
+  right();
   //delay until sometime and continue
 }
 
@@ -146,8 +173,10 @@ void fullTurn(){
 //Determine the correct motor speed for your robot
 void adjustSpeeds()
 {
+  int adjustSpeedsState = 0;
+  while(adjustSpeedsState == 0)
   if(!digitalRead(bumpL) || !digitalRead(bumpR))
-    delay(500); //give user time to get the other bumper pressed too
+    delay(250); //give user time to get the other bumper pressed too
   if(!digitalRead(bumpL) && digitalRead(bumpR))
   {
     left_speed17-=DELTA;
@@ -169,11 +198,12 @@ void adjustSpeeds()
     EEPROM.write(1, right_speed17); //save right speed to EEPROM address 1
     right_speed17 = left_speed17 = 0; //set wheel speeds to zero to stop Bot
     delay(100);
+    adjustSpeedsState =1;
   }
 }
 
 //Waits for a button to be pressed, and then released. Used as start button for robot
-void waitButton(){
+void WaitButton(){
    int state = 0;
    while(state <= 1)
   {
@@ -203,7 +233,7 @@ void grab() {
    delay(25);
   }
   
-  }
+  
   delay(25);
  
   if( grip_angle >= 170){
@@ -216,8 +246,8 @@ void grab() {
 }
 
 //Determines the starting position of the robot, need to write
-void whichStart() {
-  no_start = 0;
+void whichStart() {/*
+  int no_start = 0;
   while(no_start == 0){
    if IR sensor reads L
       start_position = 1;
@@ -228,7 +258,8 @@ void whichStart() {
    else if IR sensor reads R
       start_position = 3;
       no_start = 1;
-  }
+      
+  }*/
 }
 
 void setup() {
@@ -240,15 +271,15 @@ void setup() {
   servo1Pan.write(110);
   servo2Tilt.write(70);
   servo3Grip.write(40);
-  pinMode(motorL, OUTPUT);
-  pinMode(motorR, OUTPUT);
-  pinMode(speedL, OUTPUT);
-  pinMode(speedR, OUTPUT);
-  pinMode(button,  INPUT);
-  pinMode(bumpL,   INPUT);
-  pinMode(bumpL,   INPUT);
-  pinMode(encodeL, INPUT);
-  pinMode(encodeR, INPUT);
+  pinMode(motorL,OUTPUT);
+  pinMode(motorR,OUTPUT);
+  pinMode(speedL,OUTPUT);
+  pinMode(speedR,OUTPUT);
+  pinMode(button,INPUT);
+  pinMode(bumpL,INPUT);
+  pinMode(bumpR,INPUT);
+  pinMode(encodeL,INPUT);
+  pinMode(encodeR,INPUT);
   analogWrite(speedR,  0);
   analogWrite(speedL,  0);
   WaitButton();
@@ -260,7 +291,7 @@ void loop() {
 int cycle = 0; // Used to be able to make sure that no collisions occur
 
 //If we are using the hard coding method, this will be the format we will use.
-switch(cycle){
+/*switch(cycle){
   case //number
     if(start_position == 1){
       //path
@@ -273,10 +304,20 @@ switch(cycle){
     else //Third Start Position{
       // third path
      }
-    
-}
+  */
 
+   forward();
+ 
+   left();
+   forward();
+   forward();
+   fullTurn();
+   forward();
+   forward();
+   right();
+   forward();
+   
+}
 
   
-}
 
